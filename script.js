@@ -70,6 +70,14 @@ const pc2 = [
     45,41,49,35,28,31
 ];
 
+// Таблица перестановки в функции F
+const p = [
+    15,6,19,20,28,11,27,16,
+    0,14,22,25,4,17,30,9,
+    1,7,23,13,31,26,2,8,
+    18,12,29,5,21,10,3,24
+];
+
 // Таблица расширения Е
 const eTable = [
     31,0,1,2,3,4,3,4,
@@ -134,6 +142,8 @@ const sTable = [
 const biteMoves = [1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1];
 
 const encrypt = (message, key) => {
+    print(`Исходное сообщение: '${message}'`);
+    print(`Исходный ключ: '${key}'`);
     // Заменяем каждую букву на соответствующее ей битовое значение из объекта
     let binaryMessage = message.split("").map(letter => alphabet[letter]).join("");
     let binaryKey = key.split("").map(letter => alphabet[letter]).join("");
@@ -191,10 +201,82 @@ const encrypt = (message, key) => {
         print(`<div style='font-size:10px'>${idx+1} key: ${key}</div>`);
     })
 
-    F(keys[0], msgRight);
-    // keys.forEach(key => {
-    //     F(key, msgRight);
-    // })
+    // Создаем буфер для хранения результатов
+    let left = msgLeft;
+    let right = msgRight;
+
+    keys.forEach((key, idx) => {
+        print(`<div style='border-top: 5px solid blue'></div>`);
+        print(`<h3>Раунд №${idx+1}</h3>`);
+        print(`Входные данные:`);
+        print(`L(${idx}): ${left}`);
+        print(`R(${idx}): ${right}`);
+        print(`k(${idx}): ${key}`);
+
+        // Получаем результат функции F
+        const resultF = F(key, right);
+
+        // Делаем XOR левой части с резульатом функции
+        print('Делаем XOR левой части с резульатом функции');
+        left = XOR(left, resultF);
+        print('Результат XOR:', left);
+
+        // Меняем местами ветви шифра
+        print('Меняем местами ветви шифра');
+        [left, right] = [right, left];
+        print(`Теперь левая сторона: ${left}`);
+        print(`А правая сторона: ${right}`);
+        print(`<div style='border-top: 3px solid blue'></div>`);
+    });
+    
+    // Меняеем порядок блоков в шифре
+    print('Меняем порядок блоков в шифре');
+    let finalBits = right + left;
+    print(finalBits);
+
+    // Делаем финальную перестановку
+    print('Финальная перестановка');
+    finalBits = permutation('final', finalBits);
+    print('Финальное бинарное сообщение:');
+    print(`<h2>${finalBits}</h2>`)
+
+    alert(`Если вкратце, я преобразовал сообщение '${message}' с ключом '${key}' вот в это: ${finalBits}. \nБолее подробное решение вы можете найти ниже после загрузки страницы.`);
+    alert('И да, поставьте пожалуйста зачёт, я очень сильно старался ;)');
+}
+
+// Основная функция шифрования
+const F = (keyN, msgPart) => {
+    // print('<div style="border-top:5px solid red;height:0px">');
+    print('<b>Функция F</b>')
+    print('Входящее сообщение:', msgPart);
+    print('Ключ:', keyN);
+
+    // Расширяем количество бит входящего сообщения до 48 через функцию Е
+    msgPart = E(msgPart);
+    print('Расширенное сообщение:', msgPart);
+    print('Выполняем XOR между расширенным сообщением и ключом');
+
+    // Складываем расширенное сообщение по модулю 2 с ключом
+    const xored = XOR(msgPart, keyN);
+    print('Результат XOR', xored);
+
+    // Получаем B блоки
+    const Bblocks = getB6blocks(xored);
+    print('<b>B-блоки (6 бит):', Bblocks.join(', '), '</b>');
+
+    // Получаем В` блоки
+    const B4blocks = Bblocks.map((Bblock, idx) => getB4block(Bblock, idx));
+    print(`<b>B'-блоки (4 бит):`, B4blocks.join(', '), '</b>');
+
+    // Получаем результирующее значение функции F
+    let result = B4blocks.join('');
+
+    // Делаем перестановку значения функции F
+    print('Выполняем перестановку');
+    result = get32key(result);
+    print(`<b style='font-size: 16px'>Результат функции F: ${result}</b>`);
+    // print('<div style="border-top:5px solid red;height:0px">');
+    return result;
 }
 
 const get16keys = (keyLeft, keyRight, mode) => {
@@ -261,7 +343,17 @@ const get48key = (key) => {
     return arr.join('');
 }
 
-// Функция расширение Е
+// Функция делает перестановку бит для результата функции F согласно таблице P
+const get32key = (key) => {
+    let arr = [];
+    const keyBitesArr = key.split('');
+    for(let i = 0; i< key.length; i++) {
+        arr[i] = keyBitesArr[p[i]];
+    }
+    return arr.join('');
+}
+
+// Функция расширения Е
 const E = (msgPart) => {
     let arr = [];
     const msgBitesArr = msgPart.split('');
@@ -271,29 +363,7 @@ const E = (msgPart) => {
     return arr.join('');
 }
 
-// Основная функция шифрования
-const F = (keyN, msgPart) => {
-    print('<b>Функция F</b>')
-    print('Входящее сообщение:', msgPart);
-    print('Ключ:', keyN);
-
-    // Расширяем количество бит входящего сообщения до 48 через функцию Е
-    msgPart = E(msgPart);
-    print('Расширенное сообщение:', msgPart);
-
-    // Складываем расширенное сообщение по модулю 2 с ключом
-    const xored = XOR(msgPart, keyN);
-    print('Результат XOR', xored);
-
-    // Получаем B блоки
-    const Bblocks = getB6blocks(xored);
-    print('<b>B-блоки (6 бит):', Bblocks.join(', '), '</b>');
-
-    // Получаем В` блоки
-    const B4blocks = Bblocks.map((Bblock, idx) => getB4block(Bblock, idx));
-    print(`<b>B'-блоки (4 бит):`, B4blocks.join(', '), '</b>');
-}
-
+// Функция возвращает 4-битный B` блок из переданного в нее 6-битного В-блока
 const getB4block = (B6block, blockIdx) => {
     print(`<b>Блок ${B6block}</b>`);
 
@@ -325,6 +395,7 @@ const XOR = (bytes1, bytes2) => {
     return bytesArr1.map((el, idx) => el ^ bytesArr2[idx]).join('');
 }
 
+// Функция возвращает В-блоки по 6 бит
 const getB6blocks = (bites) => {
     const arr = [];
     let start = 0;
@@ -333,6 +404,19 @@ const getB6blocks = (bites) => {
         arr.push(bites.slice(start,finish));
         start = finish;
         finish += 6;
+    }
+    return arr;
+}
+
+// Функция разбивает переданное в нее сообщение на бинарные буквы
+const getBinatyLetters = (message) => {
+    const arr = [];
+    let start = 0;
+    let finish = 8;
+    while (finish <= message.length) {
+        arr.push(message.slice(start,finish));
+        start = finish;
+        finish += 8;
     }
     return arr;
 }
