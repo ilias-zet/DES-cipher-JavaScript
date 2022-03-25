@@ -59,6 +59,17 @@ const pc1 = [
     28,20,12,4,27,19,11,3
 ];
 
+// Таблица перестановки ключа PC-2
+const pc2 = [
+    13,16,10,23,0,4,2,
+    27,14,5,20,9,22,18,
+    11,3,25,7,15,6,26,
+    19,12,1,40,51,30,36,
+    46,54,29,39,50,44,32,
+    47,43,48,38,55,33,52,
+    45,41,49,35,28,31
+];
+
 // Таблица расширения Е
 const e = [
     31,0,1,2,3,4,3,4,
@@ -72,11 +83,72 @@ const e = [
 // Массив значений битовых сдвигов ключа
 const byteMoves = [1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1];
 
-// Заменяем каждую букву на соответствующее ей битовое значение из объекта
-let binaryMessage = message.split("").map(letter => alphabet[letter]).join("");
-let binaryKey = key.split("").map(letter => alphabet[letter]).join("");
-print('Бинарное сообщение:', binaryMessage);
-print('Бинарный ключ:', binaryKey);
+const encrypt = (message, key) => {
+    // Заменяем каждую букву на соответствующее ей битовое значение из объекта
+    let binaryMessage = message.split("").map(letter => alphabet[letter]).join("");
+    let binaryKey = key.split("").map(letter => alphabet[letter]).join("");
+    print('Бинарное сообщение:', binaryMessage);
+    print('Бинарный ключ:', binaryKey);
+
+    // Дополняем ключ и сообщение до 64-битного формата
+    binaryMessage = get64bytes(binaryMessage);
+    binaryKey = get64bytes(binaryKey);
+    print('64-битное сообщение:', binaryMessage);
+    print('64-битный ключ:', binaryKey);
+    
+    // Выполняем начальную перестановку
+    binaryMessage = permutation('initial', binaryMessage);
+    print('Начальная перестановка сообщения:', binaryMessage);
+
+    // Делим сообщение на левую и правую части путём обрезания соответствующих частей строк
+    const msgLeft = binaryMessage.slice(0,binaryMessage.length / 2);
+    const msgRight = binaryMessage.slice(binaryMessage.length / 2, binaryMessage.length);
+    print('Левая часть сообщения:', msgLeft);
+    print('Правая часть сообщения:', msgRight);
+
+    // Создаем 56-битный ключ
+    const key56 = get56key(binaryKey);
+    print('56-битный ключ', key56);
+    
+    // Делим 56-битный ключ на левую и правую часть
+    keyLeft = key56.slice(0, key56.length / 2);
+    keyRight = key56.slice(key56.length / 2, key56.length);
+    print('Левая часть ключа:', keyLeft);
+    print('Правая часть ключа:', keyRight);
+
+    // Получаем 16 C(n)-D(n) пар ключей для шифрования
+    print('Получаем 16 C(n)-D(n) пар ключей для шифрования');
+    const [leftKeysArr, rightKeysArr] = get16keys(keyLeft, keyRight, 'initial');
+    for(let i = 0; i < 16; i++) {
+        print(`
+        <div style='font-size:10px;display:flex'>
+            <div style='color:blue;'>C(${i+1}): ${leftKeysArr[i]}</div>
+            <div style='color:red;margin-left: 10px'>D(${i+1}): ${rightKeysArr[i]}</div>
+        </div>`);
+    }
+
+    // Формируем массив объединённых частей ключей
+    print('Формируем массив объединённых частей ключей');
+    const keys = leftKeysArr.map((leftKey, idx) => leftKey + rightKeysArr[idx]);
+    keys.forEach((key, idx) => {
+        print(`<div style='font-size:10px'>${idx+1} key: ${key}</div>`);
+    })
+}
+
+const get16keys = (keyLeft, keyRight, mode) => {
+    let leftKeysArr = [];
+    let rightKeysArr = [];
+    let direction;
+    if (mode === 'initial') direction = 'left';
+    else if (mode === 'final') direction = 'right';
+    byteMoves.forEach(bitesCount => {
+        keyLeft = bitShift(keyLeft, direction, bitesCount);
+        keyRight = bitShift(keyRight, direction, bitesCount);
+        leftKeysArr.push(keyLeft);
+        rightKeysArr.push(keyRight);
+    });
+    return [leftKeysArr, rightKeysArr];
+}
 
 // Функция дополняет входящую строку до числа бит кратному 64
 const get64bytes = (str) => {
@@ -84,19 +156,15 @@ const get64bytes = (str) => {
     return str;
 }
 
-const bitShift = (bytes, direction, count) => {
-    let bytesArr = bytes.split('');
+// Функция делает циклический битовый сдвиг
+const bitShift = (bytesStr, direction, count) => {
+    let bytesArr = bytesStr.split('');
     let k;
     if (direction == 'right') k = -1;
     else if (direction == 'left') k = 1;
-    bytesArr.splice(k * count).concat(bytesArr);
+    return bytesArr.splice(k * count).concat(bytesArr).join('');
 }
 
-// Дополняем ключ и сообщение до 64-битного формата
-binaryMessage = get64bytes(binaryMessage);
-binaryKey = get64bytes(binaryKey);
-print('64-битное сообщение:', binaryMessage);
-print('64-битный ключ:', binaryKey);
 
 // Функция для начальной и финальной перестановки
 const permutation = (mode, message) => {
@@ -111,16 +179,6 @@ const permutation = (mode, message) => {
     return arr.join('');
 }
 
-// Собственно сама начальная перестановка
-binaryMessage = permutation('initial', binaryMessage);
-print('Начальная перестановка сообщения:', binaryMessage);
-
-// Делим сообщение на левую и правую части путём обрезания соответствующих частей строк
-const msgLeft = binaryMessage.slice(0,binaryMessage.length / 2);
-const msgRight = binaryMessage.slice(binaryMessage.length / 2, binaryMessage.length);
-print('Левая часть сообщения:', msgLeft);
-print('Правая часть сообщения:', msgRight);
-
 // Функция делает перестановку бит в переданном в нее ключе согласно таблице PC-1
 const get56key = (key) => {
     let arr = [];
@@ -131,15 +189,19 @@ const get56key = (key) => {
     return arr.join('');
 }
 
-// Создаем 56-битный ключ
-const key56 = get56key(binaryKey);
-print('56-битный ключ', key56);
+// функция делает перестановку бит согласно таблице PC-2
+const get48key = (key) => {
+    let arr = [];
+    const keyBitesArr = key.split('');
+    for(let i = 0; i< key.length; i++) {
+        arr[i] = keyBitesArr[pc2[i]];
+    }
+    return arr.join('');
+}
 
-// Делим 56-битный ключ на левую и правую часть
-keyLeft = key56.slice(0, key56.length / 2);
-keyRight = key56.slice(key56.length / 2, key56.length);
-print('Левая часть ключа:', keyLeft);
-print('Правая часть ключа:', keyRight);
+
+
+encrypt(message, key);
 // 
 // 
 // 
